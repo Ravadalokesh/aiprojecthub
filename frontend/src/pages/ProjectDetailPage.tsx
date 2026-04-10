@@ -659,6 +659,20 @@ export default function ProjectDetailPage() {
                           )}
                         </ul>
                       )}
+                      {aiInsights.health.suggestions?.length > 0 && (
+                        <ul className="mt-3 space-y-1">
+                          {aiInsights.health.suggestions.map(
+                            (s: string, i: number) => (
+                              <li
+                                key={i}
+                                className="text-sm text-primary-700 flex items-start gap-1"
+                              >
+                                <span className="shrink-0">&#10003;</span> {s}
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      )}
                     </div>
                   </div>
                 </div>
