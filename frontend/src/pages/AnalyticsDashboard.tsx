@@ -26,7 +26,9 @@ const defaultAnalytics = {
   taskMetrics: {
     totalTasks: 0,
     completedTasks: 0,
+    todoTasks: 0,
     inProgressTasks: 0,
+    inReviewTasks: 0,
     backlogTasks: 0,
   },
   timeMetrics: { estimatedHours: 0, actualHours: 0, variance: 0 },
