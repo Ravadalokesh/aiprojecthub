@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { projectAPI, taskAPI, aiAPI } from "../services/api";
+import { useAppSelector } from "../hooks/useRedux";
 import Layout from "../components/Layout";
 import {
   ArrowLeft,
@@ -31,6 +32,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { user } = useAppSelector((state) => state.auth);
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,7 @@ export default function ProjectDetailPage() {
   const [taskForm, setTaskForm] = useState({
     title: "",
     description: "",
+    assignee: "",
     priority: "medium",
     status: "backlog",
     dueDate: "",
@@ -47,17 +50,22 @@ export default function ProjectDetailPage() {
   });
   const [aiTaskInput, setAiTaskInput] = useState("");
   const [tab, setTab] = useState<"board" | "list" | "ai">("board");
+  const [taskScope, setTaskScope] = useState<"all" | "mine">("all");
+
+  const isOwner = !!project && !!user && project.owner?._id === user._id;
+
+  useEffect(() => {
+    if (!isOwner) {
+      setTaskScope("all");
+    }
+  }, [isOwner]);
 
   useEffect(() => {
     if (!projectId) return;
     const fetchData = async () => {
       try {
-        const [projRes, tasksRes] = await Promise.all([
-          projectAPI.getProject(projectId),
-          taskAPI.getTasks(projectId),
-        ]);
+        const projRes = await projectAPI.getProject(projectId);
         setProject(projRes.data.data);
-        setTasks(tasksRes.data.data);
       } catch (err) {
         console.error("Failed to fetch project data");
       } finally {
@@ -66,6 +74,23 @@ export default function ProjectDetailPage() {
     };
     fetchData();
   }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || !project || !user) return;
+
+    const fetchTasks = async () => {
+      try {
+        const filter =
+          isOwner && taskScope === "mine" ? { assignee: user._id } : undefined;
+        const tasksRes = await taskAPI.getTasks(projectId, filter);
+        setTasks(tasksRes.data.data);
+      } catch (_err) {
+        setTasks([]);
+      }
+    };
+
+    fetchTasks();
+  }, [projectId, project, user, isOwner, taskScope]);
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +102,7 @@ export default function ProjectDetailPage() {
         priority: taskForm.priority,
         status: taskForm.status,
       };
+      if (taskForm.assignee) payload.assignee = taskForm.assignee;
       if (taskForm.dueDate) payload.dueDate = taskForm.dueDate;
       if (taskForm.estimatedHours)
         payload.estimatedHours = Number(taskForm.estimatedHours);
@@ -86,6 +112,7 @@ export default function ProjectDetailPage() {
       setTaskForm({
         title: "",
         description: "",
+        assignee: "",
         priority: "medium",
         status: "backlog",
         dueDate: "",
@@ -105,6 +132,7 @@ export default function ProjectDetailPage() {
       setTaskForm({
         title: res.data.data.title || "",
         description: res.data.data.description || "",
+        assignee: "",
         priority: res.data.data.priority || "medium",
         status: "backlog",
         dueDate: "",
@@ -260,6 +288,31 @@ export default function ProjectDetailPage() {
           ))}
         </div>
 
+        {isOwner && (
+          <div className="inline-flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+            <button
+              onClick={() => setTaskScope("all")}
+              className={`px-3 py-1.5 text-xs rounded-md font-medium transition ${
+                taskScope === "all"
+                  ? "bg-white shadow text-gray-900"
+                  : "text-gray-600"
+              }`}
+            >
+              All Tasks
+            </button>
+            <button
+              onClick={() => setTaskScope("mine")}
+              className={`px-3 py-1.5 text-xs rounded-md font-medium transition ${
+                taskScope === "mine"
+                  ? "bg-white shadow text-gray-900"
+                  : "text-gray-600"
+              }`}
+            >
+              My Tasks
+            </button>
+          </div>
+        )}
+
         {/* AI Task Bar */}
         <div className="flex gap-3">
           <div className="flex-1 relative">
@@ -329,6 +382,25 @@ export default function ProjectDetailPage() {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Assignee
+                    </label>
+                    <select
+                      value={taskForm.assignee}
+                      onChange={(e) =>
+                        setTaskForm({ ...taskForm, assignee: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Unassigned</option>
+                      {project.members?.map((member) => (
+                        <option key={member._id} value={member._id}>
+                          {member.name} ({member.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Priority
@@ -460,6 +532,9 @@ export default function ProjectDetailPage() {
                           >
                             {task.priority}
                           </span>
+                          <span className="text-xs text-gray-500">
+                            {task.assignee?.name || "Unassigned"}
+                          </span>
                           {task.dueDate && (
                             <span className="text-xs text-gray-500">
                               {new Date(task.dueDate).toLocaleDateString()}
@@ -508,6 +583,9 @@ export default function ProjectDetailPage() {
                     Priority
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                    Assignee
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
                     Due Date
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
@@ -518,7 +596,7 @@ export default function ProjectDetailPage() {
               <tbody className="divide-y divide-gray-100">
                 {tasks.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-gray-500">
+                    <td colSpan={6} className="text-center py-8 text-gray-500">
                       No tasks yet. Create one above!
                     </td>
                   </tr>
@@ -561,6 +639,9 @@ export default function ProjectDetailPage() {
                         >
                           {task.priority}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {task.assignee?.name || "Unassigned"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {task.dueDate
