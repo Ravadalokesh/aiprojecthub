@@ -20,18 +20,50 @@ export interface CreateTaskInput {
   title: string;
   description?: string;
   priority?: string;
+  status?: string;
   dueDate?: Date;
   estimatedHours?: number;
   assignee?: string;
 }
+
+const isProjectOwner = (
+  project: {
+    owner: { toString(): string };
+  },
+  userId: string,
+) => project.owner.toString() === userId;
+
+const isTaskVisibleToUser = (
+  task: {
+    assignee?: { toString(): string } | null;
+  },
+  userId: string,
+) => !!task.assignee && task.assignee.toString() === userId;
+
+const validateAssigneeInProject = (
+  project: {
+    owner: { toString(): string };
+    members: Array<{ toString(): string }>;
+  },
+  assigneeId: string,
+) =>
+  project.owner.toString() === assigneeId ||
+  project.members.some((member) => member.toString() === assigneeId);
 
 export const createTask = async (
   projectId: string,
   userId: string,
   input: CreateTaskInput,
 ): Promise<ITask> => {
-  const { title, description, priority, dueDate, estimatedHours, assignee } =
-    input;
+  const {
+    title,
+    description,
+    priority,
+    status,
+    dueDate,
+    estimatedHours,
+    assignee,
+  } = input;
 
   if (!title) {
     throw new ValidationError("Task title is required");
@@ -47,14 +79,26 @@ export const createTask = async (
     throw new ForbiddenError("You don't have access to this project");
   }
 
+  const owner = isProjectOwner(project, userId);
+  const normalizedAssignee = assignee?.trim() || "";
+  const resolvedAssignee = normalizedAssignee || (!owner ? userId : undefined);
+
+  if (
+    resolvedAssignee &&
+    !validateAssigneeInProject(project, resolvedAssignee)
+  ) {
+    throw new ValidationError("Assignee must be a member of this project");
+  }
+
   const task = await Task.create({
     title,
     description,
     projectId,
     priority,
+    status,
     dueDate,
     estimatedHours,
-    assignee,
+    assignee: resolvedAssignee,
     createdBy: userId,
   });
 
@@ -75,6 +119,8 @@ export const getTasks = async (
     throw new ForbiddenError("You don't have access to this project");
   }
 
+  const owner = isProjectOwner(project, userId);
+
   const query: Record<string, unknown> = { projectId };
 
   if (filter?.status) {
@@ -87,6 +133,10 @@ export const getTasks = async (
 
   if (filter?.assignee) {
     query.assignee = filter.assignee;
+  }
+
+  if (!owner) {
+    query.assignee = userId;
   }
 
   const tasks = await Task.find(query)
@@ -115,6 +165,10 @@ export const getTaskById = async (
     throw new ForbiddenError("You don't have access to this task");
   }
 
+  if (!isProjectOwner(project, userId) && !isTaskVisibleToUser(task, userId)) {
+    throw new ForbiddenError("You can only view tasks assigned to you");
+  }
+
   return task;
 };
 
@@ -133,6 +187,23 @@ export const updateTask = async (
   const project = await Project.findById(task.projectId);
   if (!project || !hasProjectAccess(project, userId)) {
     throw new ForbiddenError("You don't have access to this task");
+  }
+
+  const owner = isProjectOwner(project, userId);
+
+  if (!owner && !isTaskVisibleToUser(task, userId)) {
+    throw new ForbiddenError("You can only update tasks assigned to you");
+  }
+
+  if (!owner && updates.assignee && updates.assignee.toString() !== userId) {
+    throw new ForbiddenError("Only project owner can reassign tasks");
+  }
+
+  if (
+    updates.assignee &&
+    !validateAssigneeInProject(project, updates.assignee.toString())
+  ) {
+    throw new ValidationError("Assignee must be a member of this project");
   }
 
   const updatedTask = await Task.findByIdAndUpdate(taskId, updates, {
@@ -165,6 +236,10 @@ export const deleteTask = async (
     throw new ForbiddenError("You don't have access to this task");
   }
 
+  if (!isProjectOwner(project, userId)) {
+    throw new ForbiddenError("Only project owner can delete tasks");
+  }
+
   await Task.findByIdAndDelete(taskId);
 };
 
@@ -185,6 +260,12 @@ export const addSubtask = async (
   const project = await Project.findById(task.projectId);
   if (!project || !hasProjectAccess(project, userId)) {
     throw new ForbiddenError("You don't have access to this task");
+  }
+
+  if (!isProjectOwner(project, userId) && !isTaskVisibleToUser(task, userId)) {
+    throw new ForbiddenError(
+      "You can only update subtasks for tasks assigned to you",
+    );
   }
 
   task.subtasks.push({
