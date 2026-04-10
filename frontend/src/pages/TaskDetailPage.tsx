@@ -53,6 +53,26 @@ export default function TaskDetailPage() {
     actualHours: "",
     progress: 0,
   });
+  const assignableMembers = (() => {
+    const entries = new Map<string, { _id: string; label: string }>();
+
+    projectMembers.forEach((raw: any) => {
+      if (!raw) return;
+      const id = typeof raw._id === "string" ? raw._id : "";
+      if (!id || entries.has(id)) return;
+
+      const name = typeof raw.name === "string" ? raw.name.trim() : "";
+      const email = typeof raw.email === "string" ? raw.email.trim() : "";
+      const label =
+        name && email
+          ? `${name} (${email})`
+          : name || email || `Member ${id.slice(-6)}`;
+
+      entries.set(id, { _id: id, label });
+    });
+
+    return Array.from(entries.values());
+  })();
 
   useEffect(() => {
     if (!taskId) return;
@@ -400,9 +420,9 @@ export default function TaskDetailPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="">Unassigned</option>
-                    {projectMembers.map((member) => (
+                    {assignableMembers.map((member) => (
                       <option key={member._id} value={member._id}>
-                        {member.name} ({member.email})
+                        {member.label}
                       </option>
                     ))}
                   </select>
