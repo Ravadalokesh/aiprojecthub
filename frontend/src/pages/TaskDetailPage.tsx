@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { taskAPI } from "../services/api";
+import { taskAPI, projectAPI } from "../services/api";
 import Layout from "../components/Layout";
 import {
   ArrowLeft,
@@ -12,8 +12,10 @@ import {
   Loader2,
   Trash2,
   Calendar,
+  User,
 } from "lucide-react";
-import type { Task } from "../types";
+import type { Task, User as AppUser } from "../types";
+import { useAppSelector } from "../hooks/useRedux";
 
 const STATUS_OPTIONS = [
   { key: "backlog", label: "Backlog" },
@@ -33,7 +35,10 @@ const PRIORITY_COLORS: Record<string, string> = {
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
+  const { user } = useAppSelector((state) => state.auth);
   const [task, setTask] = useState<Task | null>(null);
+  const [projectMembers, setProjectMembers] = useState<AppUser[]>([]);
+  const [isProjectOwner, setIsProjectOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -42,6 +47,7 @@ export default function TaskDetailPage() {
     description: "",
     priority: "medium",
     status: "backlog",
+    assignee: "",
     dueDate: "",
     estimatedHours: "",
     actualHours: "",
@@ -55,11 +61,23 @@ export default function TaskDetailPage() {
         const res = await taskAPI.getTask(taskId);
         const t = res.data.data;
         setTask(t);
+
+        try {
+          const projectRes = await projectAPI.getProject(t.projectId);
+          const project = projectRes.data.data;
+          setProjectMembers(project.members || []);
+          setIsProjectOwner(project.owner?._id === user?._id);
+        } catch (_error) {
+          setProjectMembers([]);
+          setIsProjectOwner(false);
+        }
+
         setEditForm({
           title: t.title,
           description: t.description || "",
           priority: t.priority,
           status: t.status,
+          assignee: t.assignee?._id || "",
           dueDate: t.dueDate
             ? new Date(t.dueDate).toISOString().split("T")[0]
             : "",
@@ -87,6 +105,9 @@ export default function TaskDetailPage() {
         status: editForm.status,
         progress: editForm.progress,
       };
+      if (isProjectOwner) {
+        payload.assignee = editForm.assignee || null;
+      }
       if (editForm.dueDate) payload.dueDate = editForm.dueDate;
       if (editForm.estimatedHours)
         payload.estimatedHours = Number(editForm.estimatedHours);
@@ -363,6 +384,32 @@ export default function TaskDetailPage() {
                   >
                     {task.priority}
                   </span>
+                )}
+              </div>
+
+              <div>
+                <h4 className="text-xs font-medium text-gray-500 uppercase mb-1 flex items-center gap-1">
+                  <User className="h-3 w-3" /> Assignee
+                </h4>
+                {editing && isProjectOwner ? (
+                  <select
+                    value={editForm.assignee}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, assignee: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Unassigned</option>
+                    {projectMembers.map((member) => (
+                      <option key={member._id} value={member._id}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-gray-700">
+                    {task.assignee?.name || "Unassigned"}
+                  </p>
                 )}
               </div>
 
