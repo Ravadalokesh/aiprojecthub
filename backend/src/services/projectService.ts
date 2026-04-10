@@ -1,5 +1,7 @@
 import Project, { IProject } from "../models/Project";
 import User from "../models/User";
+import Team from "../models/Team";
+import Task from "../models/Task";
 import {
   NotFoundError,
   ValidationError,
@@ -31,6 +33,21 @@ export const createProject = async (
     throw new ValidationError("Project code already exists");
   }
 
+  if (teamId) {
+    const team = await Team.findById(teamId);
+    if (!team) {
+      throw new ValidationError("Selected team does not exist");
+    }
+
+    const isLead = team.lead.toString() === userId;
+    const isMember = team.members.some(
+      (member) => member.toString() === userId,
+    );
+    if (!isLead && !isMember) {
+      throw new ForbiddenError("You must belong to the selected team");
+    }
+  }
+
   const project = await Project.create({
     name,
     description,
@@ -51,6 +68,12 @@ export const createProject = async (
   await User.findByIdAndUpdate(userId, {
     $push: { projects: project._id },
   });
+
+  if (teamId) {
+    await Team.findByIdAndUpdate(teamId, {
+      $addToSet: { projects: project._id },
+    });
+  }
 
   return project;
 };
@@ -142,6 +165,18 @@ export const deleteProject = async (
     throw new ForbiddenError("Only project owner can delete project");
   }
 
+  await Task.deleteMany({ projectId });
+
+  await User.updateMany(
+    { projects: project._id },
+    { $pull: { projects: project._id } },
+  );
+
+  await Team.updateMany(
+    { projects: project._id },
+    { $pull: { projects: project._id } },
+  );
+
   await Project.findByIdAndDelete(projectId);
 };
 
@@ -160,6 +195,11 @@ export const addProjectMember = async (
     throw new ForbiddenError("Only project owner can add members");
   }
 
+  const member = await User.findById(memberId);
+  if (!member) {
+    throw new NotFoundError("Member not found");
+  }
+
   // Check if member already exists
   if (project.members.some((m) => m.toString() === memberId)) {
     throw new ValidationError("Member already added to project");
@@ -169,11 +209,19 @@ export const addProjectMember = async (
   await project.save();
 
   // Add project to user
-  await User.findByIdAndUpdate(memberId, {
+  await User.findByIdAndUpdate(member._id, {
     $push: { projects: projectId },
   });
 
-  return project;
+  const populatedProject = await Project.findById(projectId)
+    .populate("owner", "-password")
+    .populate("members", "-password");
+
+  if (!populatedProject) {
+    throw new NotFoundError("Project not found");
+  }
+
+  return populatedProject;
 };
 
 export const removeProjectMember = async (
@@ -191,6 +239,10 @@ export const removeProjectMember = async (
     throw new ForbiddenError("Only project owner can remove members");
   }
 
+  if (project.owner.toString() === memberId) {
+    throw new ValidationError("Project owner cannot be removed");
+  }
+
   project.members = project.members.filter((m) => m.toString() !== memberId);
   await project.save();
 
@@ -199,5 +251,13 @@ export const removeProjectMember = async (
     $pull: { projects: projectId },
   });
 
-  return project;
+  const populatedProject = await Project.findById(projectId)
+    .populate("owner", "-password")
+    .populate("members", "-password");
+
+  if (!populatedProject) {
+    throw new NotFoundError("Project not found");
+  }
+
+  return populatedProject;
 };
