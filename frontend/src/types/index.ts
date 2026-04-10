@@ -13,6 +13,7 @@ export interface Project {
   code: string;
   status: "planning" | "active" | "on-hold" | "completed" | "archived";
   owner: User;
+  team?: string | Team;
   members: User[];
   startDate: Date;
   endDate?: Date;
