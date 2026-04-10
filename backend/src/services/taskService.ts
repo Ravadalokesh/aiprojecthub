@@ -1,5 +1,6 @@
 import Task, { ITask } from "../models/Task";
 import Project from "../models/Project";
+import Team from "../models/Team";
 import {
   NotFoundError,
   ForbiddenError,
@@ -40,7 +41,7 @@ const isTaskVisibleToUser = (
   userId: string,
 ) => !!task.assignee && task.assignee.toString() === userId;
 
-const validateAssigneeInProject = (
+const isAssigneeInProject = (
   project: {
     owner: { toString(): string };
     members: Array<{ toString(): string }>;
@@ -49,6 +50,48 @@ const validateAssigneeInProject = (
 ) =>
   project.owner.toString() === assigneeId ||
   project.members.some((member) => member.toString() === assigneeId);
+
+const isAssigneeInLinkedTeam = async (
+  project: {
+    team?: { toString(): string } | null;
+  },
+  assigneeId: string,
+) => {
+  if (!project.team) {
+    return false;
+  }
+
+  const team = await Team.findById(project.team).select("lead members");
+  if (!team) {
+    return false;
+  }
+
+  return (
+    team.lead.toString() === assigneeId ||
+    team.members.some((member) => member.toString() === assigneeId)
+  );
+};
+
+const canAssignToUser = async (
+  project: {
+    owner: { toString(): string };
+    members: Array<{ toString(): string }>;
+    team?: { toString(): string } | null;
+  },
+  assigneeId: string,
+) => {
+  if (isAssigneeInProject(project, assigneeId)) {
+    return true;
+  }
+
+  return isAssigneeInLinkedTeam(project, assigneeId);
+};
+
+const ensureProjectMember = async (projectId: string, assigneeId: string) => {
+  await Project.findByIdAndUpdate(projectId, {
+    $addToSet: { members: assigneeId },
+  });
+};
 
 export const createTask = async (
   projectId: string,
@@ -83,11 +126,12 @@ export const createTask = async (
   const normalizedAssignee = assignee?.trim() || "";
   const resolvedAssignee = normalizedAssignee || (!owner ? userId : undefined);
 
-  if (
-    resolvedAssignee &&
-    !validateAssigneeInProject(project, resolvedAssignee)
-  ) {
+  if (resolvedAssignee && !(await canAssignToUser(project, resolvedAssignee))) {
     throw new ValidationError("Assignee must be a member of this project");
+  }
+
+  if (resolvedAssignee) {
+    await ensureProjectMember(projectId, resolvedAssignee);
   }
 
   const task = await Task.create({
@@ -201,9 +245,16 @@ export const updateTask = async (
 
   if (
     updates.assignee &&
-    !validateAssigneeInProject(project, updates.assignee.toString())
+    !(await canAssignToUser(project, updates.assignee.toString()))
   ) {
     throw new ValidationError("Assignee must be a member of this project");
+  }
+
+  if (updates.assignee) {
+    await ensureProjectMember(
+      project._id.toString(),
+      updates.assignee.toString(),
+    );
   }
 
   const updatedTask = await Task.findByIdAndUpdate(taskId, updates, {
