@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import {
-  BarChart3,
-  Loader2,
-} from "lucide-react";
+import { BarChart3, Loader2 } from "lucide-react";
 import Layout from "../components/Layout";
 import { analyticsAPI, projectAPI } from "../services/api";
 import { useAppSelector, useAppDispatch } from "../hooks/useRedux";
@@ -121,8 +118,10 @@ export default function AnalyticsDashboard() {
 
   const taskDistribution = [
     { name: "Done", value: tm.completedTasks, color: "#10b981" },
+    { name: "To Do", value: tm.todoTasks || 0, color: "#f59e0b" },
     { name: "In Progress", value: tm.inProgressTasks, color: "#3b82f6" },
-    { name: "Backlog", value: tm.backlogTasks, color: "#f59e0b" },
+    { name: "In Review", value: tm.inReviewTasks || 0, color: "#8b5cf6" },
+    { name: "Backlog", value: tm.backlogTasks, color: "#6b7280" },
   ].filter((d) => d.value > 0);
 
   const pb = analytics.priorityBreakdown;
