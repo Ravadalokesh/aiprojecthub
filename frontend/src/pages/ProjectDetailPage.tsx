@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { projectAPI, taskAPI, aiAPI } from "../services/api";
+import { projectAPI, taskAPI, aiAPI, teamAPI } from "../services/api";
 import { useAppSelector } from "../hooks/useRedux";
 import Layout from "../components/Layout";
 import {
@@ -12,7 +12,7 @@ import {
   Brain,
   Loader2,
 } from "lucide-react";
-import type { Project, Task } from "../types";
+import type { Project, Task, User as AppUser } from "../types";
 
 const STATUS_COLUMNS = [
   { key: "backlog", label: "Backlog", color: "bg-gray-100" },
@@ -51,8 +51,46 @@ export default function ProjectDetailPage() {
   const [aiTaskInput, setAiTaskInput] = useState("");
   const [tab, setTab] = useState<"board" | "list" | "ai">("board");
   const [taskScope, setTaskScope] = useState<"all" | "mine">("all");
+  const [teamMembers, setTeamMembers] = useState<AppUser[]>([]);
 
   const isOwner = !!project && !!user && project.owner?._id === user._id;
+  const assignableMembers = (() => {
+    const entries = new Map<string, { _id: string; label: string }>();
+
+    const addMember = (raw: any) => {
+      if (!raw) return;
+      const id =
+        typeof raw === "string"
+          ? raw
+          : typeof raw._id === "string"
+            ? raw._id
+            : "";
+
+      if (!id || entries.has(id)) return;
+
+      const name =
+        typeof raw === "object" && typeof raw.name === "string"
+          ? raw.name.trim()
+          : "";
+      const email =
+        typeof raw === "object" && typeof raw.email === "string"
+          ? raw.email.trim()
+          : "";
+
+      const label =
+        name && email
+          ? `${name} (${email})`
+          : name || email || `Member ${id.slice(-6)}`;
+
+      entries.set(id, { _id: id, label });
+    };
+
+    addMember(project?.owner as any);
+    (project?.members || []).forEach(addMember);
+    teamMembers.forEach(addMember);
+
+    return Array.from(entries.values());
+  })();
 
   useEffect(() => {
     if (!isOwner) {
@@ -65,7 +103,24 @@ export default function ProjectDetailPage() {
     const fetchData = async () => {
       try {
         const projRes = await projectAPI.getProject(projectId);
-        setProject(projRes.data.data);
+        const loadedProject = projRes.data.data;
+        setProject(loadedProject);
+
+        const teamId =
+          typeof loadedProject.team === "string"
+            ? loadedProject.team
+            : loadedProject.team?._id;
+
+        if (teamId) {
+          try {
+            const teamRes = await teamAPI.getTeam(teamId);
+            setTeamMembers(teamRes.data.data.members || []);
+          } catch {
+            setTeamMembers([]);
+          }
+        } else {
+          setTeamMembers([]);
+        }
       } catch (err) {
         console.error("Failed to fetch project data");
       } finally {
@@ -394,9 +449,9 @@ export default function ProjectDetailPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
                       <option value="">Unassigned</option>
-                      {project.members?.map((member) => (
+                      {assignableMembers.map((member) => (
                         <option key={member._id} value={member._id}>
-                          {member.name} ({member.email})
+                          {member.label}
                         </option>
                       ))}
                     </select>
