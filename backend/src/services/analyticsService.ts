@@ -4,7 +4,10 @@ import User from "../models/User";
 import { NotFoundError, ForbiddenError } from "../middleware/errorHandler";
 
 const hasProjectAccess = (
-  project: { owner: { toString(): string }; members: Array<{ toString(): string }> },
+  project: {
+    owner: { toString(): string };
+    members: Array<{ toString(): string }>;
+  },
   userId: string,
 ) =>
   project.owner.toString() === userId ||
@@ -28,9 +31,11 @@ export const getProjectAnalytics = async (
 
   // Task metrics
   const completedTasks = tasks.filter((t) => t.status === "done").length;
+  const todoTasks = tasks.filter((t) => t.status === "todo").length;
   const inProgressTasks = tasks.filter(
     (t) => t.status === "in-progress",
   ).length;
+  const inReviewTasks = tasks.filter((t) => t.status === "in-review").length;
   const backlogTasks = tasks.filter((t) => t.status === "backlog").length;
   const totalTasks = tasks.length;
 
@@ -104,7 +109,9 @@ export const getProjectAnalytics = async (
     taskMetrics: {
       totalTasks,
       completedTasks,
+      todoTasks,
       inProgressTasks,
+      inReviewTasks,
       backlogTasks,
     },
     timeMetrics: {
