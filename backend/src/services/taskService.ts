@@ -7,7 +7,10 @@ import {
 } from "../middleware/errorHandler";
 
 const hasProjectAccess = (
-  project: { owner: { toString(): string }; members: Array<{ toString(): string }> },
+  project: {
+    owner: { toString(): string };
+    members: Array<{ toString(): string }>;
+  },
   userId: string,
 ) =>
   project.owner.toString() === userId ||
@@ -170,6 +173,10 @@ export const addSubtask = async (
   userId: string,
   subtaskTitle: string,
 ) => {
+  if (!subtaskTitle || !subtaskTitle.trim()) {
+    throw new ValidationError("Subtask title is required");
+  }
+
   const task = await Task.findById(taskId);
   if (!task) {
     throw new NotFoundError("Task not found");
@@ -181,7 +188,7 @@ export const addSubtask = async (
   }
 
   task.subtasks.push({
-    title: subtaskTitle,
+    title: subtaskTitle.trim(),
     completed: false,
     createdAt: new Date(),
   } as any);
