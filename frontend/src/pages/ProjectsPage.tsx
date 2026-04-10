@@ -6,8 +6,9 @@ import {
   addProject,
   deleteProject as removeProject,
 } from "../store/slices/projectsSlice";
-import { projectAPI } from "../services/api";
+import { projectAPI, teamAPI } from "../services/api";
 import Layout from "../components/Layout";
+import type { Team } from "../types";
 import {
   FolderOpen,
   Plus,
@@ -27,27 +28,33 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [form, setForm] = useState({
     name: "",
     description: "",
     code: "",
+    teamId: "",
     status: "planning" as string,
     endDate: "",
     budget: "",
   });
 
   useEffect(() => {
-    const fetchProjects = async () => {
+    const fetchData = async () => {
       try {
-        const response = await projectAPI.getProjects();
-        dispatch(setProjects(response.data.data));
+        const [projectsRes, teamsRes] = await Promise.all([
+          projectAPI.getProjects(),
+          teamAPI.getTeams(),
+        ]);
+        dispatch(setProjects(projectsRes.data.data));
+        setTeams(teamsRes.data.data || []);
       } catch (error) {
-        console.error("Failed to fetch projects");
+        console.error("Failed to fetch projects/teams");
       } finally {
         setLoading(false);
       }
     };
-    fetchProjects();
+    fetchData();
   }, [dispatch]);
 
   const filteredProjects = projects.filter((p) => {
@@ -63,6 +70,7 @@ export default function ProjectsPage() {
       name: "",
       description: "",
       code: "",
+      teamId: "",
       status: "planning",
       endDate: "",
       budget: "",
@@ -78,6 +86,7 @@ export default function ProjectsPage() {
         name: form.name,
         description: form.description,
         code: form.code,
+        teamId: form.teamId || undefined,
         status: form.status,
       };
       if (form.endDate) payload.endDate = form.endDate;
@@ -115,6 +124,7 @@ export default function ProjectsPage() {
       name: p.name,
       description: p.description || "",
       code: p.code,
+      teamId: typeof p.team === "string" ? p.team : p.team?._id || "",
       status: p.status,
       endDate: p.endDate ? new Date(p.endDate).toISOString().split("T")[0] : "",
       budget: p.budget?.toString() || "",
@@ -235,6 +245,28 @@ export default function ProjectsPage() {
                       <option value="completed">Completed</option>
                       <option value="archived">Archived</option>
                     </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Linked Team
+                    </label>
+                    <select
+                      value={form.teamId}
+                      onChange={(e) =>
+                        setForm({ ...form, teamId: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">No team</option>
+                      {teams.map((team) => (
+                        <option key={team._id} value={team._id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Team members can then be assigned tasks from this project.
+                    </p>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
