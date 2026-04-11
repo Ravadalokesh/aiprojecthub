@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Zap,
@@ -10,69 +9,13 @@ import {
   TrendingUp,
   Layout,
   CheckSquare,
-  FolderOpen,
 } from "lucide-react";
 import { useAppSelector } from "../hooks/useRedux";
 import PublicLayout from "../components/PublicLayout";
 
-interface PublicProject {
-  _id: string;
-  name: string;
-  code: string;
-  description?: string;
-  status: string;
-  members?: Array<unknown>;
-}
-
-const getPublicApiBaseUrl = () => {
-  const configured = (import.meta.env.VITE_API_URL || "")
-    .trim()
-    .replace(/\/+$/, "");
-
-  if (!configured) {
-    return import.meta.env.DEV ? "/api" : "http://localhost:5000/api";
-  }
-
-  if (configured === "/api" || configured.endsWith("/api")) {
-    return configured;
-  }
-
-  if (/^https?:\/\/[^/]+$/i.test(configured)) {
-    return `${configured}/api`;
-  }
-
-  return configured;
-};
-
 export default function LandingPage() {
   const navigate = useNavigate();
   const { token } = useAppSelector((state) => state.auth);
-  const [publicProjects, setPublicProjects] = useState<PublicProject[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(true);
-
-  useEffect(() => {
-    const fetchPublicProjects = async () => {
-      try {
-        const response = await fetch(
-          `${getPublicApiBaseUrl()}/projects/public`,
-        );
-        if (!response.ok) {
-          throw new Error("Failed to load projects");
-        }
-
-        const payload = (await response.json()) as {
-          data?: PublicProject[];
-        };
-        setPublicProjects(payload.data || []);
-      } catch (_error) {
-        setPublicProjects([]);
-      } finally {
-        setLoadingProjects(false);
-      }
-    };
-
-    fetchPublicProjects();
-  }, []);
 
   const handleProjectClick = () => {
     if (token) {
@@ -82,16 +25,6 @@ export default function LandingPage() {
       const event = new CustomEvent("openLoginModal");
       window.dispatchEvent(event);
     }
-  };
-
-  const handlePublicProjectClick = (projectId: string) => {
-    if (token) {
-      navigate(`/projects/${projectId}`);
-      return;
-    }
-
-    const event = new CustomEvent("openLoginModal");
-    window.dispatchEvent(event);
   };
 
   return (
@@ -349,69 +282,6 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Public Projects */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between mb-10">
-            <div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-2">
-                Explore Public Projects
-              </h2>
-              <p className="text-gray-600">
-                Preview live workspaces created by teams on ProjectHub
-              </p>
-            </div>
-            <button
-              onClick={handleProjectClick}
-              className="text-primary-600 hover:text-primary-700 font-semibold"
-            >
-              Open your workspace
-            </button>
-          </div>
-
-          {loadingProjects ? (
-            <div className="text-center py-10 text-gray-500">
-              Loading public projects...
-            </div>
-          ) : publicProjects.length === 0 ? (
-            <div className="text-center py-14 bg-gray-50 rounded-xl border border-gray-200">
-              <FolderOpen className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-600">No public projects available yet.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {publicProjects.slice(0, 6).map((project) => (
-                <button
-                  key={project._id}
-                  onClick={() => handlePublicProjectClick(project._id)}
-                  className="text-left bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl p-5 transition"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {project.name}
-                      </h3>
-                      <p className="text-xs text-gray-500 font-mono mt-1">
-                        {project.code}
-                      </p>
-                    </div>
-                    <span className="text-xs px-2 py-1 rounded-full bg-white border border-gray-200 text-gray-600 capitalize">
-                      {project.status}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-4 line-clamp-2">
-                    {project.description || "No description provided"}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-4">
-                    Members: {project.members?.length || 0}
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </section>
 
