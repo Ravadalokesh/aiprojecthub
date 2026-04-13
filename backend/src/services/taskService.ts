@@ -87,29 +87,6 @@ const canAssignToUser = async (
   return isAssigneeInLinkedTeam(project, assigneeId);
 };
 
-const canManageAssignments = async (
-  project: {
-    owner: { toString(): string };
-    team?: { toString(): string } | null;
-  },
-  userId: string,
-) => {
-  if (project.owner.toString() === userId) {
-    return true;
-  }
-
-  if (!project.team) {
-    return false;
-  }
-
-  const team = await Team.findById(project.team).select("lead");
-  if (!team) {
-    return false;
-  }
-
-  return team.lead.toString() === userId;
-};
-
 const ensureProjectMember = async (projectId: string, assigneeId: string) => {
   await Project.findByIdAndUpdate(projectId, {
     $addToSet: { members: assigneeId },
@@ -146,16 +123,8 @@ export const createTask = async (
   }
 
   const owner = isProjectOwner(project, userId);
-  const assignmentManager = await canManageAssignments(project, userId);
   const normalizedAssignee = assignee?.trim() || "";
-  const resolvedAssignee =
-    normalizedAssignee || (!assignmentManager ? userId : undefined);
-
-  if (resolvedAssignee && resolvedAssignee !== userId && !assignmentManager) {
-    throw new ForbiddenError(
-      "Only project owner or team lead can assign tasks to other members",
-    );
-  }
+  const resolvedAssignee = normalizedAssignee || (!owner ? userId : undefined);
 
   if (resolvedAssignee && !(await canAssignToUser(project, resolvedAssignee))) {
     throw new ValidationError("Assignee must be a member of this project");
@@ -265,20 +234,13 @@ export const updateTask = async (
   }
 
   const owner = isProjectOwner(project, userId);
-  const assignmentManager = await canManageAssignments(project, userId);
 
   if (!owner && !isTaskVisibleToUser(task, userId)) {
     throw new ForbiddenError("You can only update tasks assigned to you");
   }
 
-  if (
-    updates.assignee &&
-    updates.assignee.toString() !== userId &&
-    !assignmentManager
-  ) {
-    throw new ForbiddenError(
-      "Only project owner or team lead can reassign tasks",
-    );
+  if (!owner && updates.assignee && updates.assignee.toString() !== userId) {
+    throw new ForbiddenError("Only project owner can reassign tasks");
   }
 
   if (
