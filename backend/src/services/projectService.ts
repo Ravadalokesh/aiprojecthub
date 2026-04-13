@@ -92,6 +92,7 @@ export const getProjects = async (
 
   const projects = await Project.find(query)
     .populate("owner", "-password")
+    .populate("team", "name")
     .populate("members", "-password")
     .sort({ createdAt: -1 });
 
@@ -104,6 +105,7 @@ export const getProjectById = async (
 ): Promise<IProject> => {
   const project = await Project.findById(projectId)
     .populate("owner", "-password")
+    .populate("team", "name")
     .populate("members", "-password");
 
   if (!project) {
@@ -142,6 +144,7 @@ export const updateProject = async (
     runValidators: true,
   })
     .populate("owner", "-password")
+    .populate("team", "name")
     .populate("members", "-password");
 
   if (!updatedProject) {
@@ -215,6 +218,7 @@ export const addProjectMember = async (
 
   const populatedProject = await Project.findById(projectId)
     .populate("owner", "-password")
+    .populate("team", "name")
     .populate("members", "-password");
 
   if (!populatedProject) {
@@ -253,6 +257,7 @@ export const removeProjectMember = async (
 
   const populatedProject = await Project.findById(projectId)
     .populate("owner", "-password")
+    .populate("team", "name")
     .populate("members", "-password");
 
   if (!populatedProject) {
