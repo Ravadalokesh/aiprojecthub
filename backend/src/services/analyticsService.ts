@@ -4,18 +4,18 @@ import User from "../models/User";
 import { NotFoundError, ForbiddenError } from "../middleware/errorHandler";
 
 const resolveId = (value: unknown) => {
-  if (!value) return null;
+  if (!value) return "";
   if (typeof value === "string") return value;
   if (typeof value === "object" && "_id" in value) {
-    const withId = value as { _id?: { toString(): string } | string };
-    if (!withId._id) return null;
+    const withId = value as { _id?: string | { toString(): string } };
+    if (!withId._id) return "";
     return typeof withId._id === "string" ? withId._id : withId._id.toString();
   }
   if (typeof value === "object" && "toString" in value) {
-    const asObjectId = value as { toString(): string };
-    return asObjectId.toString();
+    const objectIdLike = value as { toString(): string };
+    return objectIdLike.toString();
   }
-  return null;
+  return "";
 };
 
 const hasProjectAccess = (
@@ -112,7 +112,7 @@ export const getProjectAnalytics = async (
       name: member.name,
       tasksCompleted: memberTasks.filter((t) => t.status === "done").length,
       hoursLogged: memberTasks.reduce(
-        (sum, t) => sum + (t.actualHours || 0),
+        (sum, t) => sum + (Number(t.actualHours) || 0),
         0,
       ),
     };
@@ -146,10 +146,7 @@ export const getProjectAnalytics = async (
       atRiskTasks,
       estimationAccuracy:
         estimatedHours > 0
-          ? Math.max(
-              0,
-              Math.min(100, Math.round((1 - Math.abs(variance) / 100) * 100)),
-            )
+          ? Math.round((1 - Math.abs(variance) / 100) * 100)
           : 100,
     },
     priorityBreakdown,
@@ -218,9 +215,11 @@ export const getProjectVelocity = async (
   for (let i = weeks - 1; i >= 0; i--) {
     const weekStart = new Date(now);
     weekStart.setDate(weekStart.getDate() - i * 7);
+    weekStart.setHours(0, 0, 0, 0);
 
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 7);
+    weekEnd.setHours(23, 59, 59, 999);
 
     const weekTasks = tasks.filter(
       (t) =>
@@ -232,7 +231,10 @@ export const getProjectVelocity = async (
     velocity.push({
       week: `Week ${weeks - i}`,
       tasks: weekTasks.length,
-      hours: weekTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0),
+      hours: weekTasks.reduce(
+        (sum, t) => sum + (Number(t.actualHours) || 0),
+        0,
+      ),
     });
   }
 
