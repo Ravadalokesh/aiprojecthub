@@ -4,6 +4,7 @@ import AIInsight from "../models/AIInsight";
 import { NotFoundError } from "../middleware/errorHandler";
 
 const OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+const OPENROUTER_TIMEOUT_MS = 20000;
 
 type AIProvider = "openrouter";
 
@@ -39,11 +40,16 @@ const cleanJsonResponse = (text: string) => {
     return trimmed;
   }
 
-  return trimmed.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "").trim();
+  return trimmed
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
 };
 
 const extractRetryAfterSeconds = (error: any) => {
-  const retryAfterHeader = error?.retryAfter || error?.headers?.get?.("retry-after");
+  const retryAfterHeader =
+    error?.retryAfter || error?.headers?.get?.("retry-after");
   if (typeof retryAfterHeader === "string" && /^\d+$/.test(retryAfterHeader)) {
     return Number(retryAfterHeader);
   }
@@ -75,7 +81,10 @@ const normalizeAIError = (error: any, provider: AIProvider): AIErrorInfo => {
     };
   }
 
-  if (lowerMessage.includes("rate limit") || lowerMessage.includes("too many requests")) {
+  if (
+    lowerMessage.includes("rate limit") ||
+    lowerMessage.includes("too many requests")
+  ) {
     return {
       kind: "rate-limit",
       status,
@@ -123,6 +132,7 @@ const logAIError = (errorInfo: AIErrorInfo) => {
 
 const generateWithOpenRouter = async (
   prompt: string,
+  model: string,
 ): Promise<AITextResult> => {
   const config = getOpenRouterConfig();
   if (!config) {
@@ -138,10 +148,14 @@ const generateWithOpenRouter = async (
   }
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
+
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
+        signal: controller.signal,
         headers: {
           Authorization: `Bearer ${config.apiKey}`,
           "Content-Type": "application/json",
@@ -151,7 +165,7 @@ const generateWithOpenRouter = async (
           "X-Title": "ProjectHub",
         },
         body: JSON.stringify({
-          model: config.model,
+          model,
           messages: [
             {
               role: "user",
@@ -163,6 +177,7 @@ const generateWithOpenRouter = async (
         }),
       },
     );
+    clearTimeout(timeout);
 
     if (!response.ok) {
       const errorBody = (await response
@@ -196,7 +211,10 @@ const generateWithOpenRouter = async (
         ? content.trim()
         : Array.isArray(content)
           ? content
-              .filter((part) => part?.type === "text" && typeof part.text === "string")
+              .filter(
+                (part) =>
+                  part?.type === "text" && typeof part.text === "string",
+              )
               .map((part) => part.text)
               .join("\n")
               .trim()
@@ -208,6 +226,21 @@ const generateWithOpenRouter = async (
       provider: "openrouter",
     };
   } catch (error) {
+    const maybeAbort = error as { name?: string };
+    if (maybeAbort?.name === "AbortError") {
+      const timeoutError = {
+        kind: "network" as const,
+        message: `OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000}s.`,
+        provider: "openrouter" as const,
+      };
+      logAIError(timeoutError);
+      return {
+        text: null,
+        error: timeoutError,
+        provider: "openrouter",
+      };
+    }
+
     const errorInfo = normalizeAIError(error, "openrouter");
     logAIError(errorInfo);
     return {
@@ -219,7 +252,20 @@ const generateWithOpenRouter = async (
 };
 
 const generateText = async (prompt: string): Promise<AITextResult> => {
-  return generateWithOpenRouter(prompt);
+  const config = getOpenRouterConfig();
+  if (!config) {
+    return {
+      text: null,
+      error: {
+        kind: "auth",
+        message: "OPENROUTER_API_KEY is not configured.",
+        provider: "openrouter",
+      },
+      provider: "openrouter",
+    };
+  }
+
+  return generateWithOpenRouter(prompt, config.model);
 };
 
 const parseJsonResponse = <T>(text: string | null): T | null => {
@@ -247,7 +293,8 @@ export const parseTaskDescription = async (
     tags: [],
   };
 
-  const aiResult = await generateText(`You are a project management AI assistant. Parse the following task description and extract structured data.
+  const aiResult =
+    await generateText(`You are a project management AI assistant. Parse the following task description and extract structured data.
 
 Project Context: ${projectContext}
 Task Description: "${description}"
@@ -283,9 +330,9 @@ Project: ${project.name}
 Status: ${project.status}
 Total Tasks: ${tasks.length}
 Recent Tasks: ${tasks
-      .slice(0, 5)
-      .map((t) => `- ${t.title} (${t.priority})`)
-      .join("\n")}
+    .slice(0, 5)
+    .map((t) => `- ${t.title} (${t.priority})`)
+    .join("\n")}
     `;
 
   const fallback = [
@@ -293,19 +340,22 @@ Recent Tasks: ${tasks
       title: "Review top-priority unfinished work",
       description:
         "Focus the team on the most urgent open tasks so delivery risk is easier to control.",
-      action: "Sort backlog by priority and assign owners for the highest-impact items.",
+      action:
+        "Sort backlog by priority and assign owners for the highest-impact items.",
       priority: "high",
     },
     {
       title: "Reduce work in progress",
       description:
         "Too many concurrent tasks can slow delivery and hide blockers.",
-      action: "Pause low-value work and move blocked items into a visible review lane.",
+      action:
+        "Pause low-value work and move blocked items into a visible review lane.",
       priority: "medium",
     },
   ];
 
-  const aiResult = await generateText(`As a project management expert, analyze this project and provide 2-3 actionable recommendations to improve efficiency and reduce risks.
+  const aiResult =
+    await generateText(`As a project management expert, analyze this project and provide 2-3 actionable recommendations to improve efficiency and reduce risks.
 
 ${projectSummary}
 
@@ -322,12 +372,14 @@ Provide recommendations in JSON format with array of objects:
 Return ONLY valid JSON.`);
 
   const recommendations =
-    parseJsonResponse<Array<{
-      title: string;
-      description: string;
-      action: string;
-      priority: "high" | "medium" | "low";
-    }>>(aiResult.text) || fallback;
+    parseJsonResponse<
+      Array<{
+        title: string;
+        description: string;
+        action: string;
+        priority: "high" | "medium" | "low";
+      }>
+    >(aiResult.text) || fallback;
 
   for (const rec of recommendations) {
     await AIInsight.create({
@@ -374,15 +426,22 @@ export const predictProjectTimeline = async (projectId: string) => {
     confidenceScore: completedTasks.length > 0 ? 0.7 : 0.45,
     risks:
       remainingTasks.length > 0
-        ? ["Outstanding tasks may push the delivery date if blockers remain unresolved."]
+        ? [
+            "Outstanding tasks may push the delivery date if blockers remain unresolved.",
+          ]
         : [],
     recommendations:
       remainingTasks.length > 0
-        ? ["Review remaining tasks and rebalance ownership to protect the timeline."]
-        : ["Project is near completion; focus on validation and closure activities."],
+        ? [
+            "Review remaining tasks and rebalance ownership to protect the timeline.",
+          ]
+        : [
+            "Project is near completion; focus on validation and closure activities.",
+          ],
   };
 
-  const aiResult = await generateText(`Analyze project timeline data and predict completion date.
+  const aiResult =
+    await generateText(`Analyze project timeline data and predict completion date.
 
 Project Start: ${project.startDate}
 Planned End: ${project.endDate}
@@ -419,21 +478,36 @@ export const analyzeProjectHealth = async (projectId: string) => {
     : 0;
   const healthScore = Math.max(
     0,
-    Math.min(100, Math.round(completionRate * 70 + (overdueTasks.length === 0 ? 30 : 30 - overdueTasks.length * 5))),
+    Math.min(
+      100,
+      Math.round(
+        completionRate * 70 +
+          (overdueTasks.length === 0 ? 30 : 30 - overdueTasks.length * 5),
+      ),
+    ),
   );
   const fallback = {
     healthScore,
     status:
-      healthScore >= 75 ? "healthy" : healthScore >= 45 ? "at-risk" : "critical",
+      healthScore >= 75
+        ? "healthy"
+        : healthScore >= 45
+          ? "at-risk"
+          : "critical",
     warnings: overdueTasks.length
       ? [`${overdueTasks.length} task(s) are overdue and need attention.`]
       : [],
     suggestions: overdueTasks.length
-      ? ["Reassign or reschedule overdue work and review blockers with the team."]
-      : ["Keep tracking delivery cadence and close any lingering in-progress tasks."],
+      ? [
+          "Reassign or reschedule overdue work and review blockers with the team.",
+        ]
+      : [
+          "Keep tracking delivery cadence and close any lingering in-progress tasks.",
+        ],
   };
 
-  const aiResult = await generateText(`Perform a health check on this project and provide a score.
+  const aiResult =
+    await generateText(`Perform a health check on this project and provide a score.
 
 Project: ${project.name}
 Status: ${project.status}
@@ -477,14 +551,17 @@ Keep responses concise and actionable. Use markdown for formatting.`;
     return { reply: aiResult.text };
   }
 
-  const retryGuidance =
-    aiResult.error?.retryAfterSeconds
-      ? ` The provider asked us to retry in about ${aiResult.error.retryAfterSeconds} seconds.`
-      : "";
+  const retryGuidance = aiResult.error?.retryAfterSeconds
+    ? ` The provider asked us to retry in about ${aiResult.error.retryAfterSeconds} seconds.`
+    : "";
   const providerStatusMessage =
     aiResult.error?.kind === "quota" || aiResult.error?.kind === "rate-limit"
       ? "The AI provider is currently rate-limited for this project."
-      : "I couldn't reach the live AI model right now.";
+      : aiResult.error?.kind === "auth"
+        ? "The AI provider rejected authentication. Please verify the OpenRouter API key in backend environment settings."
+        : aiResult.error?.kind === "network"
+          ? "The AI provider could not be reached due to a network/timeout issue."
+          : "I couldn't reach the live AI model right now.";
 
   return {
     reply: `${providerStatusMessage}${retryGuidance} I can still help with your request about "${trimmedMessage}".
