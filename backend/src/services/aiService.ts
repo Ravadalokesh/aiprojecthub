@@ -3,7 +3,7 @@ import Project from "../models/Project";
 import AIInsight from "../models/AIInsight";
 import { NotFoundError } from "../middleware/errorHandler";
 
-const OPENROUTER_MODEL = "openrouter/auto";
+const OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 
 type AIProvider = "openrouter";
 
