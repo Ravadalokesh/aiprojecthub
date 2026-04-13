@@ -1,7 +1,8 @@
-const DEFAULT_DEV_ORIGINS = [
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const DEFAULT_DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
 
 const normalizeList = (value?: string) =>
   (value || "")
@@ -16,7 +17,9 @@ const isProduction = nodeEnv === "production";
 
 const configuredOrigins = unique([
   ...normalizeList(process.env.ALLOWED_ORIGINS),
-  ...(process.env.FRONTEND_URL?.trim() ? [process.env.FRONTEND_URL.trim()] : []),
+  ...(process.env.FRONTEND_URL?.trim()
+    ? [process.env.FRONTEND_URL.trim()]
+    : []),
   ...(!isProduction ? DEFAULT_DEV_ORIGINS : []),
 ]);
 
