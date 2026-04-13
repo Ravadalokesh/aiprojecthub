@@ -372,7 +372,7 @@ export default function ProjectsPage() {
             {filteredProjects.map((project) => (
               <div
                 key={project._id}
-                className="bg-white rounded-lg shadow hover:shadow-md transition cursor-pointer group"
+                className="bg-white rounded-lg shadow hover:shadow-md transition cursor-pointer"
               >
                 <div
                   className="p-6"
@@ -415,7 +415,7 @@ export default function ProjectsPage() {
                     </span>
                   </div>
                 </div>
-                <div className="border-t border-gray-100 px-6 py-3 flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                <div className="border-t border-gray-100 px-6 py-3 flex gap-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
