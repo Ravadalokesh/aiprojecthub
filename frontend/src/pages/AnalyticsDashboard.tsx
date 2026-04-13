@@ -224,21 +224,43 @@ export default function AnalyticsDashboard() {
                   <LineChart data={velocity}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="week" />
-                    <YAxis />
-                    <Tooltip />
+                    <YAxis
+                      yAxisId="tasks"
+                      orientation="left"
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      yAxisId="hours"
+                      orientation="right"
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      formatter={(value: number, name: string) =>
+                        name === "Hours Logged"
+                          ? [`${value}h`, name]
+                          : [value, name]
+                      }
+                    />
                     <Legend />
                     <Line
                       type="monotone"
+                      yAxisId="tasks"
                       dataKey="tasks"
                       stroke="#3b82f6"
-                      strokeWidth={2}
+                      strokeWidth={3}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
                       name="Tasks Completed"
                     />
                     <Line
                       type="monotone"
+                      yAxisId="hours"
                       dataKey="hours"
                       stroke="#10b981"
-                      strokeWidth={2}
+                      strokeWidth={3}
+                      strokeDasharray="6 4"
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
                       name="Hours Logged"
                     />
                   </LineChart>
