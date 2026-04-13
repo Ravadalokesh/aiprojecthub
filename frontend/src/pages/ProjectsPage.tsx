@@ -17,6 +17,7 @@ import {
   Edit3,
   Calendar,
   Users,
+  Building2,
 } from "lucide-react";
 
 export default function ProjectsPage() {
@@ -64,6 +65,18 @@ export default function ProjectsPage() {
     const matchStatus = !statusFilter || p.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  const getTeamName = (project: any) => {
+    if (project.team && typeof project.team === "object" && project.team.name) {
+      return project.team.name;
+    }
+
+    if (typeof project.team === "string") {
+      return teams.find((team) => team._id === project.team)?.name;
+    }
+
+    return "";
+  };
 
   const resetForm = () => {
     setForm({
@@ -383,6 +396,14 @@ export default function ProjectsPage() {
                   <p className="text-sm text-gray-600 line-clamp-2 mb-4">
                     {project.description || "No description"}
                   </p>
+                  {getTeamName(project) && (
+                    <div className="mb-3">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                        <Building2 className="h-3.5 w-3.5" />
+                        {getTeamName(project)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-4 text-xs text-gray-500">
                     <span className="flex items-center gap-1">
                       <Users className="h-3.5 w-3.5" />
