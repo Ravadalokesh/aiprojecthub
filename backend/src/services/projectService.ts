@@ -17,6 +17,15 @@ export interface CreateProjectInput {
   teamId?: string;
 }
 
+export interface UpdateProjectInput {
+  name?: string;
+  description?: string;
+  status?: IProject["status"];
+  endDate?: Date;
+  budget?: number;
+  teamId?: string;
+}
+
 export const createProject = async (
   userId: string,
   input: CreateProjectInput,
@@ -126,7 +135,7 @@ export const getProjectById = async (
 export const updateProject = async (
   projectId: string,
   userId: string,
-  updates: Partial<IProject>,
+  updates: UpdateProjectInput,
 ): Promise<IProject> => {
   const project = await Project.findById(projectId);
 
@@ -139,16 +148,75 @@ export const updateProject = async (
     throw new ForbiddenError("Only project owner can update project");
   }
 
-  const updatedProject = await Project.findByIdAndUpdate(projectId, updates, {
-    new: true,
-    runValidators: true,
-  })
+  const { teamId, ...restUpdates } = updates;
+  const updatePayload: Record<string, unknown> = { ...restUpdates };
+
+  if (typeof teamId === "string") {
+    const normalizedTeamId = teamId.trim();
+
+    if (normalizedTeamId) {
+      const team = await Team.findById(normalizedTeamId);
+      if (!team) {
+        throw new ValidationError("Selected team does not exist");
+      }
+
+      const isLead = team.lead.toString() === userId;
+      const isMember = team.members.some(
+        (member) => member.toString() === userId,
+      );
+      if (!isLead && !isMember) {
+        throw new ForbiddenError("You must belong to the selected team");
+      }
+
+      updatePayload.team = normalizedTeamId;
+    } else {
+      updatePayload.team = null;
+    }
+  }
+
+  const previousTeamId = project.team?.toString() || null;
+
+  const updatedProject = await Project.findByIdAndUpdate(
+    projectId,
+    updatePayload,
+    {
+      new: true,
+      runValidators: true,
+    },
+  )
     .populate("owner", "-password")
     .populate("team", "name")
     .populate("members", "-password");
 
   if (!updatedProject) {
     throw new NotFoundError("Project not found");
+  }
+
+  const teamValue = updatedProject.team as unknown;
+  const nextTeamId = (() => {
+    if (!teamValue) return null;
+    if (typeof teamValue === "string") return teamValue;
+    if (typeof teamValue === "object" && "_id" in teamValue) {
+      const populatedTeam = teamValue as { _id?: { toString(): string } };
+      return populatedTeam._id?.toString() || null;
+    }
+    if (typeof teamValue === "object" && "toString" in teamValue) {
+      const objectIdTeam = teamValue as { toString(): string };
+      return objectIdTeam.toString();
+    }
+    return null;
+  })();
+
+  if (previousTeamId && previousTeamId !== nextTeamId) {
+    await Team.findByIdAndUpdate(previousTeamId, {
+      $pull: { projects: updatedProject._id },
+    });
+  }
+
+  if (nextTeamId && previousTeamId !== nextTeamId) {
+    await Team.findByIdAndUpdate(nextTeamId, {
+      $addToSet: { projects: updatedProject._id },
+    });
   }
 
   return updatedProject;
