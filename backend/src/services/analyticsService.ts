@@ -3,6 +3,21 @@ import Project from "../models/Project";
 import User from "../models/User";
 import { NotFoundError, ForbiddenError } from "../middleware/errorHandler";
 
+const resolveId = (value: unknown) => {
+  if (!value) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && "_id" in value) {
+    const withId = value as { _id?: { toString(): string } | string };
+    if (!withId._id) return null;
+    return typeof withId._id === "string" ? withId._id : withId._id.toString();
+  }
+  if (typeof value === "object" && "toString" in value) {
+    const asObjectId = value as { toString(): string };
+    return asObjectId.toString();
+  }
+  return null;
+};
+
 const hasProjectAccess = (
   project: {
     owner: { toString(): string };
@@ -78,13 +93,20 @@ export const getProjectAnalytics = async (
   };
 
   // Team performance
+  const memberIds = Array.from(
+    new Set([
+      project.owner.toString(),
+      ...project.members.map((m) => m.toString()),
+    ]),
+  );
+
   const teamMembers = await User.find({
-    _id: { $in: project.members },
+    _id: { $in: memberIds },
   });
 
   const teamPerformance = teamMembers.map((member) => {
     const memberTasks = tasks.filter(
-      (t) => t.assignee?.toString() === member._id.toString(),
+      (t) => resolveId(t.assignee) === member._id.toString(),
     );
     return {
       name: member.name,
@@ -124,7 +146,10 @@ export const getProjectAnalytics = async (
       atRiskTasks,
       estimationAccuracy:
         estimatedHours > 0
-          ? Math.round((1 - Math.abs(variance) / 100) * 100)
+          ? Math.max(
+              0,
+              Math.min(100, Math.round((1 - Math.abs(variance) / 100) * 100)),
+            )
           : 100,
     },
     priorityBreakdown,
@@ -204,12 +229,8 @@ export const getProjectVelocity = async (
         t.status === "done",
     );
 
-    const weekNumber = Math.ceil(
-      (now.getTime() - weekStart.getTime()) / (7 * 24 * 60 * 60 * 1000),
-    );
-
     velocity.push({
-      week: `Week ${weeks - weekNumber}`,
+      week: `Week ${weeks - i}`,
       tasks: weekTasks.length,
       hours: weekTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0),
     });
