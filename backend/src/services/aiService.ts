@@ -3,8 +3,14 @@ import Project from "../models/Project";
 import AIInsight from "../models/AIInsight";
 import { NotFoundError } from "../middleware/errorHandler";
 
-const OPENROUTER_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
-const OPENROUTER_TIMEOUT_MS = 20000;
+const OPENROUTER_MODEL = "openrouter/auto";
+
+const cleanEnvValue = (value?: string) =>
+  (value || "")
+    .trim()
+    .replace(/^['\"]+|['\"]+$/g, "")
+    .replace(/[\r\n]/g, "")
+    .trim();
 
 type AIProvider = "openrouter";
 
@@ -23,14 +29,14 @@ interface AITextResult {
 }
 
 const getOpenRouterConfig = () => {
-  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  const apiKey = cleanEnvValue(process.env.OPENROUTER_API_KEY);
   if (!apiKey) {
     return null;
   }
 
   return {
     apiKey,
-    model: process.env.OPENROUTER_MODEL?.trim() || OPENROUTER_MODEL,
+    model: cleanEnvValue(process.env.OPENROUTER_MODEL) || OPENROUTER_MODEL,
   };
 };
 
@@ -132,7 +138,6 @@ const logAIError = (errorInfo: AIErrorInfo) => {
 
 const generateWithOpenRouter = async (
   prompt: string,
-  model: string,
 ): Promise<AITextResult> => {
   const config = getOpenRouterConfig();
   if (!config) {
@@ -148,14 +153,10 @@ const generateWithOpenRouter = async (
   }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
-
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
-        signal: controller.signal,
         headers: {
           Authorization: `Bearer ${config.apiKey}`,
           "Content-Type": "application/json",
@@ -165,7 +166,7 @@ const generateWithOpenRouter = async (
           "X-Title": "ProjectHub",
         },
         body: JSON.stringify({
-          model,
+          model: config.model,
           messages: [
             {
               role: "user",
@@ -177,7 +178,6 @@ const generateWithOpenRouter = async (
         }),
       },
     );
-    clearTimeout(timeout);
 
     if (!response.ok) {
       const errorBody = (await response
@@ -226,21 +226,6 @@ const generateWithOpenRouter = async (
       provider: "openrouter",
     };
   } catch (error) {
-    const maybeAbort = error as { name?: string };
-    if (maybeAbort?.name === "AbortError") {
-      const timeoutError = {
-        kind: "network" as const,
-        message: `OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000}s.`,
-        provider: "openrouter" as const,
-      };
-      logAIError(timeoutError);
-      return {
-        text: null,
-        error: timeoutError,
-        provider: "openrouter",
-      };
-    }
-
     const errorInfo = normalizeAIError(error, "openrouter");
     logAIError(errorInfo);
     return {
@@ -252,20 +237,7 @@ const generateWithOpenRouter = async (
 };
 
 const generateText = async (prompt: string): Promise<AITextResult> => {
-  const config = getOpenRouterConfig();
-  if (!config) {
-    return {
-      text: null,
-      error: {
-        kind: "auth",
-        message: "OPENROUTER_API_KEY is not configured.",
-        provider: "openrouter",
-      },
-      provider: "openrouter",
-    };
-  }
-
-  return generateWithOpenRouter(prompt, config.model);
+  return generateWithOpenRouter(prompt);
 };
 
 const parseJsonResponse = <T>(text: string | null): T | null => {
@@ -557,11 +529,7 @@ Keep responses concise and actionable. Use markdown for formatting.`;
   const providerStatusMessage =
     aiResult.error?.kind === "quota" || aiResult.error?.kind === "rate-limit"
       ? "The AI provider is currently rate-limited for this project."
-      : aiResult.error?.kind === "auth"
-        ? "The AI provider rejected authentication. Please verify the OpenRouter API key in backend environment settings."
-        : aiResult.error?.kind === "network"
-          ? "The AI provider could not be reached due to a network/timeout issue."
-          : "I couldn't reach the live AI model right now.";
+      : "I couldn't reach the live AI model right now.";
 
   return {
     reply: `${providerStatusMessage}${retryGuidance} I can still help with your request about "${trimmedMessage}".
