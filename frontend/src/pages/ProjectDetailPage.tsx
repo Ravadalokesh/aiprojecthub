@@ -8,6 +8,7 @@ import {
   Plus,
   Sparkles,
   Users,
+  Building2,
   Trash2,
   Brain,
   Loader2,
@@ -297,6 +298,14 @@ export default function ProjectDetailPage() {
               </span>
             </div>
             <p className="text-gray-600 text-sm mt-1">{project.description}</p>
+            {project.team &&
+              typeof project.team !== "string" &&
+              project.team.name && (
+                <p className="text-sm mt-2 text-blue-700 inline-flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4" />
+                  Team: {project.team.name}
+                </p>
+              )}
           </div>
           <div className="flex items-center gap-2">
             <div className="flex -space-x-2">
