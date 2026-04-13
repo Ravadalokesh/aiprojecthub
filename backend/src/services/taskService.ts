@@ -36,10 +36,26 @@ const isProjectOwner = (
 
 const isTaskVisibleToUser = (
   task: {
-    assignee?: { toString(): string } | null;
+    assignee?: unknown;
   },
   userId: string,
-) => !!task.assignee && task.assignee.toString() === userId;
+) => {
+  if (!task.assignee) {
+    return false;
+  }
+
+  const assignee = task.assignee as any;
+  const assigneeId =
+    typeof assignee === "string"
+      ? assignee
+      : assignee?._id
+        ? assignee._id.toString()
+        : typeof assignee.toString === "function"
+          ? assignee.toString()
+          : "";
+
+  return assigneeId === userId;
+};
 
 const isAssigneeInProject = (
   project: {
