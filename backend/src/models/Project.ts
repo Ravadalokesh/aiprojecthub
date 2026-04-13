@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import Task from "./Task";
 
 export interface IProject extends Document {
   _id: mongoose.Types.ObjectId;
@@ -39,7 +40,10 @@ const projectSchema = new Schema<IProject>(
       required: true,
       unique: true,
       uppercase: true,
-      match: [/^[A-Z0-9]{3,10}$/, "Project code must be 3-10 uppercase alphanumerics"],
+      match: [
+        /^[A-Z0-9]{3,10}$/,
+        "Project code must be 3-10 uppercase alphanumerics",
+      ],
     },
     status: {
       type: String,
@@ -92,11 +96,29 @@ const projectSchema = new Schema<IProject>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Index for better query performance
 projectSchema.index({ owner: 1, team: 1 });
 projectSchema.index({ status: 1 });
+
+// Ensure project-related tasks are removed whenever a project is deleted.
+projectSchema.pre("findOneAndDelete", async function (next) {
+  const project = await this.model.findOne(this.getFilter()).select("_id");
+  if (project?._id) {
+    await Task.deleteMany({ projectId: project._id });
+  }
+  next();
+});
+
+projectSchema.pre(
+  "deleteOne",
+  { document: true, query: false },
+  async function (next) {
+    await Task.deleteMany({ projectId: this._id });
+    next();
+  },
+);
 
 export default mongoose.model<IProject>("Project", projectSchema);
