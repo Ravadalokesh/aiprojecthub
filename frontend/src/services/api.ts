@@ -1,10 +1,34 @@
 import axios, { AxiosInstance } from "axios";
 import { APIResponse, User, Project, Task, Team } from "../types";
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV ? "/api" : "http://localhost:5000/api")
-).replace(/\/+$/, "");
+const normalizeApiBaseUrl = (url: string) => url.trim().replace(/\/+$/, "");
+
+const ensureApiSuffix = (url: string) =>
+  /\/api$/i.test(url) ? url : `${url}/api`;
+
+const resolveApiBaseUrl = () => {
+  const configuredApiUrl = String(import.meta.env.VITE_API_URL || "").trim();
+
+  if (configuredApiUrl) {
+    // Accept either full backend URL or direct /api path.
+    if (configuredApiUrl.startsWith("/")) {
+      return normalizeApiBaseUrl(configuredApiUrl);
+    }
+
+    return normalizeApiBaseUrl(ensureApiSuffix(configuredApiUrl));
+  }
+
+  if (import.meta.env.DEV) {
+    return "/api";
+  }
+
+  console.warn(
+    "VITE_API_URL is not set. Falling back to '/api'. Set VITE_API_URL in Vercel for production deployments.",
+  );
+  return "/api";
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
