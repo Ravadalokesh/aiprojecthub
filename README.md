@@ -2,7 +2,7 @@
 
 An industry-grade project management SaaS platform built with MERN stack and integrated with OpenRouter for intelligent project insights and automation.
 
-## ðŸŒŸ Key Features
+## Key Features
 
 ### Core Project Management
 
@@ -27,7 +27,7 @@ An industry-grade project management SaaS platform built with MERN stack and int
 - **Risk Indicators**: Early warnings for project delays and resource issues
 - **Historical Analytics**: Learn from past projects
 
-## ðŸ› ï¸ Tech Stack
+## Tech Stack
 
 ### Frontend
 
@@ -57,7 +57,7 @@ An industry-grade project management SaaS platform built with MERN stack and int
 - **MongoDB Atlas** - Cloud database (production)
 - **Railway/Vercel** - Deployment
 
-## ðŸ“‹ Prerequisites
+## Prerequisites
 
 - Node.js 18+
 - MongoDB 6+
@@ -65,7 +65,7 @@ An industry-grade project management SaaS platform built with MERN stack and int
 - Docker & Docker Compose (for containerized setup)
 - A working OpenRouter API key (for AI features)
 
-## ðŸš€ Quick Start
+## Quick Start
 
 ### Local Development (Without Docker)
 
@@ -120,40 +120,9 @@ docker-compose logs -f
 - MongoDB: `mongodb://localhost:27017`
 - Redis: `redis://localhost:6379`
 
-## ðŸ“ Project Structure
 
-```
-cprfinal/
-â”œâ”€â”€ backend/
-â”‚   â”œâ”€â”€ src/
-â”‚   â”‚   â”œâ”€â”€ models/          # MongoDB schemas
-â”‚   â”‚   â”œâ”€â”€ routes/          # API routes
-â”‚   â”‚   â”œâ”€â”€ services/        # Business logic
-â”‚   â”‚   â”œâ”€â”€ middleware/      # Auth, error handling
-â”‚   â”‚   â”œâ”€â”€ config/          # Database, config
-â”‚   â”‚   â””â”€â”€ server.ts        # Entry point
-â”‚   â”œâ”€â”€ Dockerfile
-â”‚   â”œâ”€â”€ tsconfig.json
-â”‚   â””â”€â”€ package.json
-â”‚
-â”œâ”€â”€ frontend/
-â”‚   â”œâ”€â”€ src/
-â”‚   â”‚   â”œâ”€â”€ components/      # React components
-â”‚   â”‚   â”œâ”€â”€ pages/           # Page components
-â”‚   â”‚   â”œâ”€â”€ store/           # Redux store
-â”‚   â”‚   â”œâ”€â”€ services/        # API services
-â”‚   â”‚   â”œâ”€â”€ types/           # TypeScript types
-â”‚   â”‚   â”œâ”€â”€ hooks/           # Custom hooks
-â”‚   â”‚   â”œâ”€â”€ App.tsx
-â”‚   â”‚   â””â”€â”€ main.tsx
-â”‚   â”œâ”€â”€ Dockerfile
-â”‚   â”œâ”€â”€ vite.config.ts
-â”‚   â””â”€â”€ package.json
-â”‚
-â””â”€â”€ docker-compose.yml
-```
 
-## ðŸ”‘ Environment Variables
+## Environment Variables
 
 ### Backend (.env)
 
@@ -176,7 +145,7 @@ VITE_API_URL=http://localhost:5000/api
 VITE_APP_NAME=ProjectHub
 ```
 
-## ðŸ” Authentication
+## Authentication
 
 The application uses JWT (JSON Web Tokens) for authentication:
 
@@ -185,7 +154,7 @@ The application uses JWT (JSON Web Tokens) for authentication:
 3. **Protected Routes**: Include token in Authorization header: `Bearer <token>`
 4. **Token Expiry**: Tokens expire after 7 days (configurable)
 
-## ðŸ“¡ API Endpoints
+## API Endpoints
 
 ### Authentication
 
@@ -228,7 +197,7 @@ GET    /api/ai/predictions/:projectId - Get timeline predictions
 GET    /api/ai/health/:projectId - Project health analysis
 ```
 
-## ðŸš€ Deployment
+## Deployment
 
 ### Production Deployment with Railway
 
@@ -270,7 +239,7 @@ docker push username/projecthub-backend:latest
 # Deploy to production using docker-compose or Kubernetes
 ```
 
-## ðŸ§ª Testing
+## Testing
 
 ### Backend Tests
 
@@ -292,21 +261,21 @@ npm test
 npm run test:e2e
 ```
 
-## ðŸ“Š Monitoring & Logging
+## Monitoring & Logging
 
 - Backend logs are written to console
 - Frontend errors are logged to browser console
 - Use `docker-compose logs` for container logs
 - Implement centralized logging (e.g., LogRocket, Sentry) for production
 
-## ðŸ¤ Contributing
+## Contributing
 
 1. Create a feature branch: `git checkout -b feature/amazing-feature`
 2. Commit changes: `git commit -m 'Add amazing-feature'`
 3. Push to branch: `git push origin feature/amazing-feature`
 4. Create Pull Request
 
-## ðŸ“‹ Roadmap
+## Roadmap
 
 - [ ] Team collaboration with live cursors
 - [ ] Gantt chart view
@@ -318,48 +287,8 @@ npm run test:e2e
 - [ ] Custom notifications
 - [ ] AI training on user data
 
-## ðŸ› Known Issues
+## Known Issues
 
 None currently. Report issues on GitHub.
 
-## ðŸ“„ License
 
-MIT License - see LICENSE file for details
-
-## ðŸ‘¥ Support
-
-For support, email support@projecthub.io or create an issue on GitHub.
-
-## ðŸŽ¯ Performance Tips
-
-- Use database indexes for frequently queried fields
-- Implement pagination for large datasets
-- Cache AI responses in Redis
-- Lazy load components
-- Compress API responses with gzip
-- Use CDN for static assets
-
-## ðŸ”’ Security Checklist
-
-- [x] Password hashing with bcrypt
-- [x] JWT token authentication
-- [x] CORS configuration
-- [x] Input validation
-- [ ] Rate limiting ready (implement in production)
-- [ ] SQL injection prevention (using Mongoose)
-- [x] XSS protection with React
-- [ ] Add HTTPS in production
-- [ ] Implement API rate limiting
-- [ ] Add request signing
-
-## ðŸ“š Additional Resources
-
-- [Express Documentation](https://expressjs.com/)
-- [React Documentation](https://react.dev/)
-- [MongoDB Documentation](https://docs.mongodb.com/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [OpenRouter Documentation](https://openrouter.ai/docs)
-
----
-
-**Made with â¤ï¸ to impress InnoCircle**
