@@ -36,7 +36,6 @@ export const createProject = async (
     throw new ValidationError("Project name and code are required");
   }
 
-  // Check if code is unique
   const existingProject = await Project.findOne({ code: code.toUpperCase() });
   if (existingProject) {
     throw new ValidationError("Project code already exists");
@@ -73,7 +72,6 @@ export const createProject = async (
     },
   });
 
-  // Add project to user
   await User.findByIdAndUpdate(userId, {
     $push: { projects: project._id },
   });
@@ -121,7 +119,6 @@ export const getProjectById = async (
     throw new NotFoundError("Project not found");
   }
 
-  // Check if user has access
   if (
     project.owner._id.toString() !== userId &&
     !project.members.some((m) => m._id.toString() === userId)
@@ -143,7 +140,6 @@ export const updateProject = async (
     throw new NotFoundError("Project not found");
   }
 
-  // Check if user is owner or manager
   if (project.owner.toString() !== userId) {
     throw new ForbiddenError("Only project owner can update project");
   }
@@ -271,7 +267,6 @@ export const addProjectMember = async (
     throw new NotFoundError("Member not found");
   }
 
-  // Check if member already exists
   if (project.members.some((m) => m.toString() === memberId)) {
     throw new ValidationError("Member already added to project");
   }
@@ -279,7 +274,6 @@ export const addProjectMember = async (
   project.members.push(memberId as any);
   await project.save();
 
-  // Add project to user
   await User.findByIdAndUpdate(member._id, {
     $push: { projects: projectId },
   });
@@ -318,7 +312,6 @@ export const removeProjectMember = async (
   project.members = project.members.filter((m) => m.toString() !== memberId);
   await project.save();
 
-  // Remove project from user
   await User.findByIdAndUpdate(memberId, {
     $pull: { projects: projectId },
   });
