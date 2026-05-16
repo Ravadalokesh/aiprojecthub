@@ -186,7 +186,6 @@ export const getTeamAnalytics = async (userId: string) => {
   };
 };
 
-// Calculate velocity based on completed tasks over time
 export const getProjectVelocity = async (
   projectId: string,
   userId: string,
