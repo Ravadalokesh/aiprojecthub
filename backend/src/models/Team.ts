@@ -46,7 +46,6 @@ const teamSchema = new Schema<ITeam>(
   }
 );
 
-// Index for performance
 teamSchema.index({ lead: 1 });
 
 export default mongoose.model<ITeam>("Team", teamSchema);
