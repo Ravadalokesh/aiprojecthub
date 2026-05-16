@@ -99,11 +99,9 @@ const projectSchema = new Schema<IProject>(
   },
 );
 
-// Index for better query performance
 projectSchema.index({ owner: 1, team: 1 });
 projectSchema.index({ status: 1 });
 
-// Ensure project-related tasks are removed whenever a project is deleted.
 projectSchema.pre("findOneAndDelete", async function (next) {
   const project = await this.model.findOne(this.getFilter()).select("_id");
   if (project?._id) {
