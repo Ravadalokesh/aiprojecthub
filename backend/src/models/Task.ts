@@ -125,7 +125,6 @@ const taskSchema = new Schema<ITask>(
   }
 );
 
-// Index for performance
 taskSchema.index({ projectId: 1, status: 1 });
 taskSchema.index({ assignee: 1 });
 taskSchema.index({ dueDate: 1 });
