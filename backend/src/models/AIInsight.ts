@@ -88,7 +88,7 @@ const aiInsightSchema = new Schema<IAIInsight>(
     },
     expiresAt: {
       type: Date,
-      default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
     },
   },
   {
@@ -96,7 +96,7 @@ const aiInsightSchema = new Schema<IAIInsight>(
   }
 );
 
-// Auto-delete expired insights
+
 aiInsightSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 aiInsightSchema.index({ projectId: 1, type: 1 });
 
